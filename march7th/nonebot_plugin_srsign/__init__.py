@@ -63,8 +63,9 @@ async def _(bot: Bot, event: Event):
         await srsign.finish()
     sr_uid = user_list[0].sr_uid
     cookie = await get_user_cookie(bot.self_id, event.get_user_id(), sr_uid)
-    stoken = await get_user_stoken(bot.self_id, event.get_user_id(), sr_uid)
-    if not cookie or not stoken:
+    #stoken = await get_user_stoken(bot.self_id, event.get_user_id(), sr_uid)
+    #if not cookie or not stoken:
+    if not cookie:
         msg = "请使用`srdel`删除已绑定的SRUID，然后重新使用`srck [cookie]`绑定或`srqr`扫码绑定"
         msg_builder = MessageFactory([Text(str(msg))])
         await msg_builder.send(at_sender=True)
