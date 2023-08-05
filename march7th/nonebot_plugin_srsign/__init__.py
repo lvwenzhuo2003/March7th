@@ -56,54 +56,61 @@ srsign = on_command(
 async def _(bot: Bot, event: Event):
     global msg, error_message
     user_list = await get_user_srbind(bot.self_id, event.get_user_id())
-    if not user_list:
-        msg = "未绑定cookie，请使用`srck [cookie]`绑定或`srqr`扫码绑定"
+    if len(user_list) == 0:
+        logger.info("没有可用cookie")
+        msg = f"没有绑定的SRUID，请使用`srck [cookie]`手动绑定或`srqr`扫码绑定"
         msg_builder = MessageFactory([Text(str(msg))])
         await msg_builder.send(at_sender=True)
-        await srsign.finish()
-    sr_uid = user_list[0].sr_uid
-    cookie = await get_user_cookie(bot.self_id, event.get_user_id(), sr_uid)
-    #stoken = await get_user_stoken(bot.self_id, event.get_user_id(), sr_uid)
-    #if not cookie or not stoken:
-    if not cookie:
-        msg = "请使用`srdel`删除已绑定的SRUID，然后重新使用`srck [cookie]`绑定或`srqr`扫码绑定"
-        msg_builder = MessageFactory([Text(str(msg))])
-        await msg_builder.send(at_sender=True)
-        await srsign.finish()
-    logger.info(f"开始为SRUID『{sr_uid}』签到")
-    await srsign.send(f"开始为SRUID『{sr_uid}』签到")
-    sr_sign_info = await mys_api.call_mihoyo_sign(
-        cookie=cookie,
-        role_uid=sr_uid
-    )
+        srsign.finish()
+    i = 0
+    for each in user_list:
+        i += 1
+        sr_uid = each.sr_uid
+        cookie = await get_user_cookie(bot.self_id, event.get_user_id(), sr_uid)
+        if not cookie:
+            logger.info(f"第{i}/{len(user_list)}顺序账号未找到cookie")
+            msg = f"账号绑定的第{i}/{len(user_list)}顺序SRUID{sr_uid}没有cookie，请使用`srdel`删除此SRUID后重新绑定"
+            msg_builder = MessageFactory([Text(str(msg))])
+            await msg_builder.send(at_sender=True)
+            continue
+        logger.info(f"开始为第{i}/{len(user_list)}顺序的SRUID『{sr_uid}』签到")
+        await srsign.send(f"开始为第{i}/{len(user_list)}顺序的SRUID『{sr_uid}』签到")
+        sr_sign_info = await mys_api.call_mihoyo_sign(
+            cookie=cookie,
+            role_uid=sr_uid
+        )
 
-    if isinstance(sr_sign_info, dict):
-        retcode = sr_sign_info["retcode"]
-        if retcode == 0:
-            is_risk = sr_sign_info["data"]["is_risk"]
-            if is_risk:
-                sr_sign_info, error_message = await geetest_handle(sign_data=sr_sign_info, cookie=cookie, role_uid=sr_uid)
-                if isinstance(error_message, dict):
-                    retcode = error_message["retcode"]
+        if isinstance(sr_sign_info, dict):
+            retcode = sr_sign_info["retcode"]
+            if retcode == 0:
+                is_risk = sr_sign_info["data"]["is_risk"]
+                if is_risk:
+                    sr_sign_info, error_message = await geetest_handle(sign_data=sr_sign_info, cookie=cookie,
+                                                                       role_uid=sr_uid)
+                    if isinstance(error_message, dict):
+                        retcode = error_message["retcode"]
+                else:
+                    logger.info(f"第{i}/{len(user_list)}个账号SRUID{sr_uid}签到成功")
+                    msg = f"第{i}/{len(user_list)}个账号SRUID{sr_uid}签到成功"
+            if retcode in error_code_msg:
+                msg = error_code_msg[retcode]
+            elif sr_sign_info != 0:
+                logger.warning(f"第{i}/{len(user_list)}个账号SRUID{sr_uid}签到失败，{error_message}")
+                msg = f"第{i}/{len(user_list)}个账号SRUID{sr_uid}签到失败，{error_message}"
             else:
-                msg = f"SRUID{sr_uid}签到成功成功"
-        if retcode in error_code_msg:
-            msg = error_code_msg[retcode]
-        elif sr_sign_info != 0:
-            msg = f"SRUID{sr_uid}签到失败，{error_message}"
-        else:
-            msg = f"签到失败，请联系管理员\n错误代码{retcode}"
+                logger.warning(f"第{i}/{len(user_list)}个账号SRUID{sr_uid}签到失败，{error_message}")
+                msg = f"第{i}/{len(user_list)}个账号SRUID{sr_uid}签到失败，请联系管理员\n错误代码{retcode}"
+            msg_builder = MessageFactory([Text(str(msg))])
+            await msg_builder.send(at_sender=True)
+        if not sr_sign_info:
+            logger.warning(f"第{i}/{len(user_list)}个账号SRUID{sr_uid}疑似cookie失效")
+            msg = f"第{i}/{len(user_list)}个账号SRUID{sr_uid}疑似cookie失效，请重新使用`srck [cookie]`绑定或`srqr`扫码绑定"
+            msg_builder = MessageFactory([Text(str(msg))])
+            await msg_builder.send(at_sender=True)
+        logger.info(f"第{i}/{len(user_list)}个账号SRUID{sr_uid}签到成功")
+        msg = f"第{i}/{len(user_list)}个账号SRUID{sr_uid}签到成功"
         msg_builder = MessageFactory([Text(str(msg))])
         await msg_builder.send(at_sender=True)
-        await srsign.finish()
-    if not sr_sign_info:
-        msg = "疑似cookie失效，请重新使用`srck [cookie]`绑定或`srqr`扫码绑定"
-        msg_builder = MessageFactory([Text(str(msg))])
-        await msg_builder.send(at_sender=True)
-        await srsign.finish()
-    msg = "签到成功"
-    msg_builder = MessageFactory([Text(str(msg))])
-    await msg_builder.send(at_sender=True)
     await srsign.finish()
 
 
