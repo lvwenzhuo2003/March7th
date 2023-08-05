@@ -89,9 +89,8 @@ async def _(bot: Bot, event: Event):
                                                                        role_uid=sr_uid)
                     if isinstance(error_message, dict):
                         retcode = error_message["retcode"]
-                else:
-                    logger.info(f"第{i}/{len(user_list)}个账号SRUID{sr_uid}签到成功")
-                    msg = f"第{i}/{len(user_list)}个账号SRUID{sr_uid}签到成功"
+                logger.info(f"第{i}/{len(user_list)}个账号SRUID{sr_uid}签到成功")
+                msg = f"第{i}/{len(user_list)}个账号SRUID{sr_uid}签到成功"
             if retcode in error_code_msg:
                 msg = error_code_msg[retcode]
             elif sr_sign_info != 0:
@@ -102,15 +101,11 @@ async def _(bot: Bot, event: Event):
                 msg = f"第{i}/{len(user_list)}个账号SRUID{sr_uid}签到失败，请联系管理员\n错误代码{retcode}"
             msg_builder = MessageFactory([Text(str(msg))])
             await msg_builder.send(at_sender=True)
-        if not sr_sign_info:
+        elif not sr_sign_info:
             logger.warning(f"第{i}/{len(user_list)}个账号SRUID{sr_uid}疑似cookie失效")
             msg = f"第{i}/{len(user_list)}个账号SRUID{sr_uid}疑似cookie失效，请重新使用`srck [cookie]`绑定或`srqr`扫码绑定"
             msg_builder = MessageFactory([Text(str(msg))])
             await msg_builder.send(at_sender=True)
-        logger.info(f"第{i}/{len(user_list)}个账号SRUID{sr_uid}签到成功")
-        msg = f"第{i}/{len(user_list)}个账号SRUID{sr_uid}签到成功"
-        msg_builder = MessageFactory([Text(str(msg))])
-        await msg_builder.send(at_sender=True)
     await srsign.finish()
 
 
