@@ -82,23 +82,20 @@ async def _(bot: Bot, event: Event):
 
         if isinstance(sr_sign_info, dict):
             retcode = sr_sign_info["retcode"]
+            if retcode == 0 and sr_sign_info["data"]["is_risk"]:
+                sr_sign_info, error_message = await geetest_handle(sign_data=sr_sign_info, cookie=cookie,
+                                                                   role_uid=sr_uid)
+                if isinstance(error_message, dict):
+                    retcode = error_message["retcode"]
             if retcode == 0:
-                is_risk = sr_sign_info["data"]["is_risk"]
-                if is_risk:
-                    sr_sign_info, error_message = await geetest_handle(sign_data=sr_sign_info, cookie=cookie,
-                                                                       role_uid=sr_uid)
-                    if isinstance(error_message, dict):
-                        retcode = error_message["retcode"]
                 logger.info(f"第{i}/{len(user_list)}个账号SRUID{sr_uid}签到成功")
                 msg = f"第{i}/{len(user_list)}个账号SRUID{sr_uid}签到成功"
-            if retcode in error_code_msg:
+            elif retcode in error_code_msg:
                 msg = error_code_msg[retcode]
-            elif sr_sign_info != 0:
+                logger.warning(f"第{i}/{len(user_list)}个账号SRUID{sr_uid}签到失败，错误代码{retcode}")
+            elif sr_sign_info != 0 and retcode not in error_code_msg:
                 logger.warning(f"第{i}/{len(user_list)}个账号SRUID{sr_uid}签到失败，{error_message}")
                 msg = f"第{i}/{len(user_list)}个账号SRUID{sr_uid}签到失败，{error_message}"
-            else:
-                logger.warning(f"第{i}/{len(user_list)}个账号SRUID{sr_uid}签到失败，{error_message}")
-                msg = f"第{i}/{len(user_list)}个账号SRUID{sr_uid}签到失败，请联系管理员\n错误代码{retcode}"
             msg_builder = MessageFactory([Text(str(msg))])
             await msg_builder.send(at_sender=True)
         elif not sr_sign_info:
