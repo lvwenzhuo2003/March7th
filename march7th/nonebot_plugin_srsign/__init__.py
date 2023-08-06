@@ -1,3 +1,5 @@
+import json
+
 import anticaptchaofficial.geetestproxyless
 from nonebot import get_driver, require
 from nonebot import on_command
@@ -54,7 +56,9 @@ srsign = on_command(
 
 @srsign.handle()
 async def _(bot: Bot, event: Event):
-    global msg, error_message
+    global msg, captcha_solution
+    geetest_result = 0
+    captcha_solution = ""
     user_list = await get_user_srbind(bot.self_id, event.get_user_id())
     if len(user_list) == 0:
         logger.info("没有可用cookie")
@@ -81,21 +85,41 @@ async def _(bot: Bot, event: Event):
         )
 
         if isinstance(sr_sign_info, dict):
-            retcode = sr_sign_info["retcode"]
-            if retcode == 0 and sr_sign_info["data"]["is_risk"]:
-                sr_sign_info, error_message = await geetest_handle(sign_data=sr_sign_info, cookie=cookie,
-                                                                   role_uid=sr_uid)
-                if isinstance(error_message, dict):
-                    retcode = error_message["retcode"]
-            if retcode == 0:
-                logger.info(f"第{i}/{len(user_list)}个账号SRUID{sr_uid}签到成功")
-                msg = f"第{i}/{len(user_list)}个账号SRUID{sr_uid}签到成功"
-            elif retcode in error_code_msg:
+            if sr_sign_info["data"]["is_risk"]:
+                retcode = sr_sign_info["data"]["risk_code"]
+            else:
+                retcode = sr_sign_info["retcode"]
+            if sr_sign_info["retcode"] == 0 and sr_sign_info["data"]["is_risk"]:
+                geetest_result, captcha_solution = await geetest_handle(sign_data=sr_sign_info, cookie=cookie,
+                                                                        role_uid=sr_uid)
+                try:
+                    captcha_solution = json.loads(captcha_solution)
+                except json.decoder.JSONDecodeError:
+                    pass
+            if geetest_result != 0:
+                logger.warning(captcha_solution)
+                msg = f"第{i}/{len(user_list)}个账号SRUID{sr_uid}签到失败，{captcha_solution}"
+                msg_builder = MessageFactory([Text(str(msg))])
+                await msg_builder.send(at_sender=True)
+                continue
+            if sr_sign_info["retcode"] == 0 and sr_sign_info["data"]["is_risk"]:
+                sr_sign_info = await sign_with_geetest(geetest_challenge=captcha_solution["challenge"],
+                                                       geetest_validate=captcha_solution["validate"],
+                                                       geetest_seccode=captcha_solution["seccode"],
+                                                       cookie=cookie, role_uid=sr_uid)
+                if sr_sign_info["retcode"] == 0:
+                    retcode = sr_sign_info["data"]["risk_code"]
+                else:
+                    retcode = sr_sign_info["retcode"]
+            if retcode in error_code_msg:
                 msg = error_code_msg[retcode]
                 logger.warning(f"第{i}/{len(user_list)}个账号SRUID{sr_uid}签到失败，错误代码{retcode}")
-            elif sr_sign_info != 0 and retcode not in error_code_msg:
-                logger.warning(f"第{i}/{len(user_list)}个账号SRUID{sr_uid}签到失败，{error_message}")
-                msg = f"第{i}/{len(user_list)}个账号SRUID{sr_uid}签到失败，{error_message}"
+            elif retcode not in error_code_msg:
+                logger.warning(f"第{i}/{len(user_list)}个账号SRUID{sr_uid}签到失败，{captcha_solution}")
+                msg = f"第{i}/{len(user_list)}个账号SRUID{sr_uid}签到失败，{captcha_solution}"
+            elif retcode == 0:
+                logger.info(f"第{i}/{len(user_list)}个账号SRUID{sr_uid}签到成功")
+                msg = f"第{i}/{len(user_list)}个账号SRUID{sr_uid}签到成功"
             msg_builder = MessageFactory([Text(str(msg))])
             await msg_builder.send(at_sender=True)
         elif not sr_sign_info:
@@ -120,16 +144,12 @@ async def geetest_handle(sign_data: dict, cookie: str, role_uid: str = "0"):
     page_url = "https://webstatic.mihoyo.com/bbs/event/signin/hkrpg/e202304121516551.html"
     gt = sign_data["data"]["gt"]
     challenge = sign_data["data"]["challenge"]
-    captcha_result, error_message = await geetest_get_result(api_key=captcha_api_key, api_endpoint=captcha_endpoint,
-                                                             gt=gt, challenge=challenge, page_url=page_url)
-    if error_message == "":
-        return 0, await sign_with_geetest(geetest_challenge=captcha_result["challenge"],
-                                          geetest_seccode=captcha_result["seccode"],
-                                          geetest_validate=captcha_result["validate"],
-                                          cookie=cookie,
-                                          role_uid=role_uid)
+    captcha_result, err_string = await geetest_get_result(api_key=captcha_api_key, api_endpoint=captcha_endpoint,
+                                                          gt=gt, challenge=challenge, page_url=page_url)
+    if err_string == "":
+        return 0, captcha_result
     else:
-        return 1, "解析验证码时出现错误。错误信息" + error_message
+        return 1, "解析验证码时出现错误。错误信息" + err_string
 
 
 async def geetest_get_result(api_key: str,
