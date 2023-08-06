@@ -92,10 +92,6 @@ async def _(bot: Bot, event: Event):
             if sr_sign_info["retcode"] == 0 and sr_sign_info["data"]["is_risk"]:
                 geetest_result, captcha_solution = await geetest_handle(sign_data=sr_sign_info, cookie=cookie,
                                                                         role_uid=sr_uid)
-                try:
-                    captcha_solution = json.loads(captcha_solution)
-                except json.decoder.JSONDecodeError:
-                    pass
             if geetest_result != 0:
                 logger.warning(captcha_solution)
                 msg = f"第{i}/{len(user_list)}个账号SRUID{sr_uid}签到失败，{captcha_solution}"
