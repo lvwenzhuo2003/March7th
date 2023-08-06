@@ -1,5 +1,3 @@
-import json
-
 import anticaptchaofficial.geetestproxyless
 from nonebot import get_driver, require
 from nonebot import on_command
