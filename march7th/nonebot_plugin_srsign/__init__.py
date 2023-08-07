@@ -88,15 +88,14 @@ async def _(bot: Bot, event: Event):
             else:
                 retcode = sr_sign_info["retcode"]
             if sr_sign_info["retcode"] == 0 and sr_sign_info["data"]["is_risk"]:
-                geetest_result, captcha_solution = await geetest_handle(sign_data=sr_sign_info, cookie=cookie,
-                                                                        role_uid=sr_uid)
+                geetest_result, captcha_solution = await geetest_handle(sign_data=sr_sign_info, role_uid=sr_uid)
             if geetest_result != 0:
                 logger.warning(captcha_solution)
                 msg = f"第{i}/{len(user_list)}个账号SRUID{sr_uid}签到失败，{captcha_solution}"
                 msg_builder = MessageFactory([Text(str(msg))])
                 await msg_builder.send(at_sender=True)
                 continue
-            if sr_sign_info["retcode"] == 0 and sr_sign_info["data"]["is_risk"]:
+            if geetest_result == 0 and sr_sign_info["data"]["is_risk"]:
                 sr_sign_info = await sign_with_geetest(geetest_challenge=captcha_solution["challenge"],
                                                        geetest_validate=captcha_solution["validate"],
                                                        geetest_seccode=captcha_solution["seccode"],
@@ -124,7 +123,7 @@ async def _(bot: Bot, event: Event):
     await srsign.finish()
 
 
-async def geetest_handle(sign_data: dict, cookie: str, role_uid: str = "0"):
+async def geetest_handle(sign_data: dict, role_uid: str = "0"):
     import nonebot
     global_config = nonebot.get_driver().config
     captcha_enable = global_config.captcha_enabled
