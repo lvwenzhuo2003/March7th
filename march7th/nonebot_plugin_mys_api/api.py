@@ -365,7 +365,6 @@ class MysApi:
         body: Optional[Dict[str, Any]] = None
         page: str = ""
         headers: Dict[str, str] = {}
-        headers_extra: Dict[str, str] = {}
         refer: str = ""
         # flags
         ds2 = False
@@ -483,7 +482,7 @@ class MysApi:
                     data = retcode
                 else:
                     logger.debug(f"Mys API {api} response: {data}")
-                    data = dict(data["data"])
+                    data = dict(data.json()["data"])
             except (json.JSONDecodeError, KeyError):
                 data = None
         if data is None:
