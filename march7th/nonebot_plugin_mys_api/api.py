@@ -8,6 +8,7 @@ from typing import Any, Dict, Literal, Optional, Union
 
 import httpx
 from nonebot.log import logger
+from nonebot.drivers import Driver, Request
 
 RECOGNIZE_SERVER = {
     "1": "prod_gf_cn",
@@ -258,6 +259,7 @@ class MysApi:
             try:
                 return data.json()
             except json.JSONDecodeError:
+                logger.warning("Failed to get cookie by game token")
                 return None
 
     async def get_stoken_by_game_token(self, uid: int, game_token: str):
@@ -285,6 +287,7 @@ class MysApi:
             try:
                 return data.json()
             except json.JSONDecodeError:
+                logger.warning("Failed to get stoken by game stoken")
                 return None
 
     async def create_login_qr(self, app_id: int):
@@ -312,6 +315,12 @@ class MysApi:
         return ret_data
 
     async def check_login_qr(self, login_data: Dict):
+        try:
+            assert "app_id" in login_data
+            assert "ticket" in login_data
+            assert "device" in login_data
+        except AssertionError:
+            return None
         params = {
             "app_id": login_data["app_id"],
             "ticket": login_data["ticket"],
@@ -323,7 +332,10 @@ class MysApi:
                 params=params,
                 timeout=10,
             )
-        return data.json()
+        try:
+            return data.json()
+        except json.JSONDecodeError:
+            return None
 
     async def call_mihoyo_api(
         self,
@@ -420,6 +432,8 @@ class MysApi:
             refer = "https://webstatic.mihoyo.com/bbs/event/signin/hkrpg/index.html?bbs_auth_required=true&act_id=e202304121516551&bbs_auth_required=true&bbs_presentation_style=fullscreen&utm_source=bbs&utm_medium=mys&utm_campaign=icon"
         else:  # api not found
             url = None
+        logger.debug(f"Mys API call: {api}")
+        logger.debug(f"URL: {url}")
         if url is not None:  # send request
             if not post:
                 # get server_id by role_uid
@@ -463,15 +477,15 @@ class MysApi:
             try:
                 retcode = int(data.json()["retcode"])
                 if retcode != 0:
-                    logger.warning(f"mys api ({api}) failed: {data.json()}")
-                    logger.warning(f"headers: {headers}")
-                    logger.warning(f"params: {params}")
+                    logger.warning(f"Mys API {api} failed: {data}")
+                    logger.warning(f"with headers: {headers}")
+                    logger.warning(f"with params: {params}")
                     data = retcode
                 else:
-                    data = dict(data.json()["data"])
+                    logger.debug(f"Mys API {api} response: {data}")
+                    data = dict(data["data"])
             except (json.JSONDecodeError, KeyError):
                 data = None
         if data is None:
-            logger.warning(f"mys api ({api}) error")
-        logger.debug(data)
+            logger.warning(f"Mys API {api} error")
         return data
