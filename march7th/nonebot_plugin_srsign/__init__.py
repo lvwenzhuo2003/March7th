@@ -1,4 +1,6 @@
 import anticaptchaofficial.geetestproxyless
+import asyncio
+import concurrent.futures
 from nonebot import get_driver, require
 from typing import List
 from nonebot import require
@@ -137,6 +139,24 @@ async def geetest_get_result(api_key: str,
                              gt: str,
                              challenge: str,
                              page_url: str):
+    # Please note that due to limitations of run_in_executor, we have modified the return. However, in order to keep
+    # compatible with original code, we have to appear working in the old way.
+    loop = asyncio.get_running_loop()
+    try:
+        with concurrent.futures.ProcessPoolExecutor() as pool:
+            token = loop.run_in_executor(pool,
+                                         geetest_get_result_async_wrapper(api_key=api_key, api_endpoint="", gt=gt, challenge=challenge,
+                                                                          page_url=page_url))
+    except ConnectionError:
+        return "", token
+    return token, ""
+
+
+def geetest_get_result_async_wrapper(api_key: str,
+                                     api_endpoint: str,
+                                     gt: str,
+                                     challenge: str,
+                                     page_url: str):
     solver = anticaptchaofficial.geetestproxyless.geetestProxyless()
     solver.set_verbose(1)
     solver.set_key(api_key)
@@ -150,7 +170,10 @@ async def geetest_get_result(api_key: str,
     logger.debug(token)
     logger.debug(solver.err_string)
     token = token
-    return token, solver.err_string
+    if solver.err_string != "":
+        token = solver.err_string
+        raise ConnectionError(solver.err_string)
+    return token
 
 
 async def geetest_validate_header(geetest_challenge: str,
